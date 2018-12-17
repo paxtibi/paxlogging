@@ -214,14 +214,14 @@ const
 var
   { Standard levels are automatically created (in decreasing severity):
     Off, Fatal, Error, Warn, Info, Debug, All. }
-  Off: TLogLevel;
+  Off:   TLogLevel;
   Fatal: TLogLevel;
   Error: TLogLevel;
-  Warn: TLogLevel;
-  Info: TLogLevel;
+  Warn:  TLogLevel;
+  Info:  TLogLevel;
   Debug: TLogLevel;
   Trace: TLogLevel;
-  All: TLogLevel;
+  All:   TLogLevel;
 
 { NDC -------------------------------------------------------------------------}
 
@@ -365,6 +365,7 @@ type
     procedure Trace(const Fmt: string; const Args: array of const; const Err: Exception = nil); overload; virtual;
     procedure Trace(const Message: string; const Err: Exception = nil); overload; virtual;
     procedure Trace(const Message: TObject; const Err: Exception = nil); overload; virtual;
+    procedure Trace(const Stream: TStream); overload; virtual;
     procedure UnlockLogger;
     procedure Warn(const Fmt: string; const Args: array of const; const Err: Exception = nil); overload; virtual;
     procedure Warn(const Message: string; const Err: Exception = nil); overload; virtual;
@@ -931,11 +932,11 @@ begin
       Exit;
     end
     else if TLogLevel(Levels[Index]).Level = Level.Level then
-    begin
-      Levels[Index].Free;
-      Levels[Index] := Level;
-      Exit;
-    end;
+      begin
+        Levels[Index].Free;
+        Levels[Index] := Level;
+        Exit;
+      end;
   Levels.Add(Level);
 end;
 
@@ -966,7 +967,7 @@ begin
       Break;
     end
     else if TLogLevel(Levels[Index]).Level < LogLevel then
-      Break;
+        Break;
 end;
 
 { Retrieve a level object given its name. }
@@ -1123,7 +1124,7 @@ begin
       if Count <= 1 then
         TLogNDC.Clear
       else if Count > 0 then
-        Delete(Count - 1);
+          Delete(Count - 1);
     end;
   finally
     LeaveCriticalSection(CriticalNDC);
@@ -1615,6 +1616,23 @@ begin
   Log(paxlog.Trace, Message, Err);
 end;
 
+procedure TLogLogger.Trace(const Stream: TStream);
+var
+  message: string;
+  len:     integer;
+begin
+  Stream.Position := 0;
+  while Stream.Position < Stream.size do
+  begin
+    len := Stream.Size;
+    SetLength(message, len);
+    Stream.Read(message[1], len);
+    Log(paxlog.Trace, Message, nil);
+  end;
+  SetLength(message, 0);
+  Stream.Position := 0;
+end;
+
 { Release synchronised access to the logger. }
 procedure TLogLogger.UnlockLogger;
 begin
@@ -1640,7 +1658,6 @@ procedure TLogLogger.Enter(const Message: string);
 begin
   Trace('Enter ' + Message);
   FTraceLevel += 1;
-
 end;
 
 procedure TLogLogger.Leave(const Message: string);
@@ -1864,7 +1881,7 @@ end;
 { Return a renderer for the named class. }
 function TLogHierarchy.GetRenderer(const RenderedClass: TClass): ILogRenderer;
 var
-  Index: integer;
+  Index:    integer;
   Rendered: TClass;
 begin
   Result := nil;
@@ -2051,9 +2068,9 @@ begin
   if Event.Level = Debug then
     Result := Result + '<font color="#339933">' + Event.Level.Name + '</font>'
   else if Event.Level.IsGreaterOrEqual(Warn) then
-    Result := Result + '<font color="#993300"><strong>' + Event.Level.Name + '</strong></font>'
-  else
-    Result := Result + Event.Level.Name;
+      Result := Result + '<font color="#993300"><strong>' + Event.Level.Name + '</strong></font>'
+    else
+      Result := Result + Event.Level.Name;
   Result := Result + '</td><td>' + Event.LoggerName + '</td>' + '<td>' + Event.NDC + '</td><td>' + Event.Message + '</td></tr>' + CRLF;
   ErrorMessage := Event.ErrorMessage;
   if ErrorMessage <> '' then
@@ -2075,7 +2092,11 @@ end;
 { Returns appropriate HTML headers. }
 function TLogHTMLLayout.GetHeader: string;
 begin
-  Result := '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" ' + '"http://www.w3.org/TR/html4/loose.dtd">' + CRLF + '<html>' + CRLF + '<head>' + CRLF + '<title>' + Title + '</title>' + CRLF + '<style type="text/css">' + CRLF + '<!--' + CRLF + 'body, table {font-family: arial,sans-serif; font-size: x-small;}' + CRLF + 'th {background: #336699; color: #FFFFFF; text-align: left;}' + CRLF + '-->' + CRLF + '</style>' + CRLF + '</head>' + CRLF + '<body bgcolor="#FFFFFF" topmargin="6" leftmargin="6">' + CRLF + '<hr size="1" noshade>' + CRLF + SessionStartMsg + ' ' + DateTimeToStr(Now) + '<br>' + CRLF + '<br>' + CRLF + '<table cellspacing="0" cellpadding="4" border="1" ' + 'bordercolor="#224466" width="100%">' + CRLF + '<tr><th>' + TimeHdr + '</th><th>' + ThreadHdr + '</th>' + '<th>' + LevelHdr + '</th><th>' + LoggerHdr + '</th>' + '<th>' + NDCHdr + '</th><th>' + MessageHdr + '</th></tr>' + CRLF;
+  Result := '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" ' + '"http://www.w3.org/TR/html4/loose.dtd">' + CRLF + '<html>' + CRLF + '<head>' + CRLF + '<title>' + Title +
+    '</title>' + CRLF + '<style type="text/css">' + CRLF + '<!--' + CRLF + 'body, table {font-family: arial,sans-serif; font-size: x-small;}' + CRLF + 'th {background: #336699; color: #FFFFFF; text-align: left;}' +
+    CRLF + '-->' + CRLF + '</style>' + CRLF + '</head>' + CRLF + '<body bgcolor="#FFFFFF" topmargin="6" leftmargin="6">' + CRLF + '<hr size="1" noshade>' + CRLF + SessionStartMsg + ' ' +
+    DateTimeToStr(Now) + '<br>' + CRLF + '<br>' + CRLF + '<table cellspacing="0" cellpadding="4" border="1" ' + 'bordercolor="#224466" width="100%">' + CRLF + '<tr><th>' + TimeHdr + '</th><th>' +
+    ThreadHdr + '</th>' + '<th>' + LevelHdr + '</th><th>' + LoggerHdr + '</th>' + '<th>' + NDCHdr + '</th><th>' + MessageHdr + '</th></tr>' + CRLF;
 end;
 
 { The HTML layout handles the exception contained in logging events.
@@ -2120,7 +2141,7 @@ end;
 
 procedure fillStack(out f: TStringList; fp: Pointer; addr: CodePointer);
 var
-  i: longint;
+  i:      longint;
   prevfp: Pointer;
   is_dev: boolean;
   stringValue: string;
@@ -2221,8 +2242,8 @@ end;
 { Extract the portions of the pattern for easier processing later. }
 procedure TLogPatternLayout.SetPattern(const Pattern: string);
 var
-  Index: integer;
-  Part: string;
+  Index:    integer;
+  Part:     string;
   PartType: TPatternPart;
 begin
   FPattern := Pattern;
@@ -2427,7 +2448,7 @@ begin
   if Name = MaxOpt then
     FMaxLevel := TLogLevel.GetLevel(Value)
   else if Name = MinOpt then
-    FMinLevel := TLogLevel.GetLevel(Value);
+      FMinLevel := TLogLevel.GetLevel(Value);
 end;
 
 { TLogStringFilter ------------------------------------------------------------}
@@ -2468,7 +2489,7 @@ begin
   if Name = MatchOpt then
     FMatch := Value
   else if Name = IgnoreCaseOpt then
-    FIgnoreCase := StrToBool(Value, FIgnoreCase);
+      FIgnoreCase := StrToBool(Value, FIgnoreCase);
 end;
 
 
@@ -2577,7 +2598,7 @@ end;
 procedure Tokenise(const Value: string; const Items: TStringList; const Delimiters: string);
 var
   Index: integer;
-  Item: string;
+  Item:  string;
 begin
   Item := '';
   for Index := 1 to Length(Value) do
@@ -2903,7 +2924,7 @@ var
   ErrorHandler: ILogErrorHandler;
   Layout: ILogLayout;
   Filter: ILogFilter;
-  Index: integer;
+  Index:  integer;
 begin
   Result := AppenderGet(AppenderName);
   if Result <> nil then
@@ -2972,9 +2993,9 @@ end;
 { Parse non-root elements, such as non-root loggers and renderers. }
 procedure TLogPropertyConfigurator.ParseLoggersAndRenderers(const Props: TStringList; const Hierarchy: TLogHierarchy);
 var
-  Index: integer;
+  Index:     integer;
   Key, Name: string;
-  Logger: TLogLogger;
+  Logger:    TLogLogger;
 begin
   for Index := 0 to Props.Count - 1 do
   begin
@@ -2992,8 +3013,8 @@ begin
       end;
     end
     else if Copy(Key, 1, Length(RendererKey)) = RendererKey then
-      AddRenderer(Hierarchy,
-        Copy(Key, Length(RendererKey) + 1, 255), Props.Values[Key]);
+        AddRenderer(Hierarchy,
+          Copy(Key, Length(RendererKey) + 1, 255), Props.Values[Key]);
   end;
 end;
 
@@ -3001,8 +3022,8 @@ end;
 procedure TLogPropertyConfigurator.ParseLogger(const Props: TStringList; const Logger: TLogLogger; const Value: string);
 var
   Appender: ILogAppender;
-  Index: integer;
-  Items: TStringList;
+  Index:    integer;
+  Items:    TStringList;
 begin
   LogLog.Debug(ParsingLoggerMsg, [Logger.Name, Value]);
   Items := TStringList.Create;
@@ -3067,7 +3088,7 @@ end;
 { Create a new instance of a class implementing a particular interface. }
 function FindClass(const ClassName: string; InterfaceType: TGUID; Names: TStringList; Classes: TClassList): IUnknown;
 var
-  Index: integer;
+  Index:   integer;
   Creator: ILogDynamicCreate;
 begin
   if ClassName = '' then
@@ -3093,7 +3114,7 @@ begin
 end;
 
 var
-  AppenderNames: TStringList;
+  AppenderNames:   TStringList;
   AppenderClasses: TClassList;
 
 procedure RegisterAppender(const Appender: TClass);
@@ -3108,7 +3129,7 @@ begin
 end;
 
 var
-  LoggerFactoryNames: TStringList;
+  LoggerFactoryNames:   TStringList;
   LoggerFactoryClasses: TClassList;
 
 procedure RegisterLoggerFactory(const LoggerFactory: TClass);
@@ -3123,7 +3144,7 @@ begin
 end;
 
 var
-  ErrorHandlerNames: TStringList;
+  ErrorHandlerNames:   TStringList;
   ErrorHandlerClasses: TClassList;
 
 procedure RegisterErrorHandler(const ErrorHandler: TClass);
@@ -3138,7 +3159,7 @@ begin
 end;
 
 var
-  FilterNames: TStringList;
+  FilterNames:   TStringList;
   FilterClasses: TClassList;
 
 procedure RegisterFilter(const Filter: TClass);
@@ -3152,7 +3173,7 @@ begin
 end;
 
 var
-  LayoutNames: TStringList;
+  LayoutNames:   TStringList;
   LayoutClasses: TClassList;
 
 procedure RegisterLayout(const Layout: TClass);
@@ -3166,7 +3187,7 @@ begin
 end;
 
 var
-  RenderedNames: TStringList;
+  RenderedNames:   TStringList;
   RenderedClasses: TClassList;
 
 { Register a class to be rendered. }
@@ -3204,7 +3225,7 @@ begin
 end;
 
 var
-  RendererNames: TStringList;
+  RendererNames:   TStringList;
   RendererClasses: TClassList;
 
 procedure RegisterRenderer(const Renderer: TClass);
@@ -3227,9 +3248,9 @@ begin
   if (Value = 'true') or (Value = 'yes') then
     Result := True
   else if (Value = 'false') or (Value = 'no') then
-    Result := False
-  else
-    Result := Default;
+      Result := False
+    else
+      Result := Default;
 end;
 
 procedure LevelFree;
