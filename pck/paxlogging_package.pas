@@ -8,8 +8,7 @@ unit paxlogging_package;
 interface
 
 uses
-  paxlog, paxlog_appender, paxlog_resources, paxlog_dispatcher, 
-  LazarusPackageIntf;
+  paxlog, LazarusPackageIntf;
 
 implementation
 

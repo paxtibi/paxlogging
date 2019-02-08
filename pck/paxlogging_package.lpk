@@ -12,23 +12,11 @@
         <UnitOutputDirectory Value="..\lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
-    <Files Count="4">
+    <Files Count="1">
       <Item1>
         <Filename Value="..\src\paxlog.pas"/>
         <UnitName Value="paxlog"/>
       </Item1>
-      <Item2>
-        <Filename Value="..\src\paxlog_appender.pas"/>
-        <UnitName Value="paxlog_appender"/>
-      </Item2>
-      <Item3>
-        <Filename Value="..\src\paxlog_resources.pas"/>
-        <UnitName Value="paxlog_resources"/>
-      </Item3>
-      <Item4>
-        <Filename Value="..\src\paxlog_dispatcher.pas"/>
-        <UnitName Value="paxlog_dispatcher"/>
-      </Item4>
     </Files>
     <RequiredPkgs Count="2">
       <Item1>
