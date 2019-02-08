@@ -32,7 +32,7 @@ type
 
   ILogFormatter = interface(IFPObserved)
     ['{4F873EA4-B0FC-4DD7-A6BD-A3A6565434B2}']
-    function format(data: TLogData): string;
+    function format(Data: TLogData): string;
   end;
 
   { ILogHandler }
@@ -40,7 +40,7 @@ type
   ILogHandler = interface(IFPObserved)
     ['{C997743F-CE50-4CB7-BC03-2B3BFDEDE60B}']
     function GetFormatter: ILogFormatter;
-    procedure process(data: TLogData);
+    procedure process(Data: TLogData);
     procedure SetFormatter(AValue: ILogFormatter);
     property Formatter: ILogFormatter read GetFormatter write SetFormatter;
   end;
@@ -72,6 +72,8 @@ type
     function getThreshold: TLogLevel;
     function getFormatter: ILogFormatter;
     procedure setFormatter(aFormatter: ILogFormatter);
+    function getHandler: ILogHandler;
+    procedure setHandler(aHandler: ILogHandler);
   end;
 
   { TAbstractLogger }
@@ -80,9 +82,11 @@ type
   protected
     FThreshold: TLogLevel;
     FFormatter: ILogFormatter;
-    procedure Log(data: TLogData); virtual; abstract;
+    FHandler: ILogHandler;
+    procedure Log(Data: TLogData); virtual; abstract;
     function getLogData(logLevel: TLogLevel; message: string): TLogData;
-    procedure FPOObservedChanged(ASender: TObject; Operation: TFPObservedOperation; Data: Pointer);
+    procedure FPOObservedChanged(ASender: TObject; Operation: TFPObservedOperation;
+      Data: Pointer);
   public
     function emergency(message: string; const parameters: array of const): ILogInterface;
     function alert(message: string; const parameters: array of const): ILogInterface;
@@ -107,6 +111,10 @@ type
 
     function getFormatter: ILogFormatter;
     procedure setFormatter(aFormatter: ILogFormatter);
+
+    function getHandler: ILogHandler;
+    procedure setHandler(aHandler: ILogHandler);
+
     constructor Create;
     destructor Destroy; override;
   end;
@@ -115,14 +123,14 @@ type
 
   TNullLogger = class(TAbstractLogger)
   protected
-    procedure Log(data: TLogData); override;
+    procedure Log(Data: TLogData); override;
   end;
 
   { TSimpleLogger }
 
   TSimpleLogger = class(TAbstractLogger)
   protected
-    procedure Log(data: TLogData); override;
+    procedure Log(Data: TLogData); override;
   end;
 
   { TAbstractFormatter }
@@ -130,7 +138,7 @@ type
   TAbstractFormatter = class(TPersistent, ILogFormatter)
   public
     destructor Destroy; override;
-    function format(data: TLogData): string; virtual; abstract;
+    function format(Data: TLogData): string; virtual; abstract;
   end;
 
   { TAbstractHandler }
@@ -139,40 +147,58 @@ type
   protected
     FFormatter: ILogFormatter;
   protected
-    procedure FPOObservedChanged(ASender: TObject; Operation: TFPObservedOperation; Data: Pointer);
+    procedure FPOObservedChanged(ASender: TObject; Operation: TFPObservedOperation;
+      Data: Pointer);
   public
     destructor Destroy; override;
-    procedure process(data: TLogData); virtual; abstract;
+    procedure process(Data: TLogData); virtual; abstract;
     function GetFormatter: ILogFormatter;
     procedure SetFormatter(AValue: ILogFormatter);
     property Formatter: ILogFormatter read GetFormatter write SetFormatter;
   end;
 
-  { TConsoleHandler }
+  { TLogConsoleHandler }
 
-  TConsoleHandler = class(TAbstractHandler)
+  TLogConsoleHandler = class(TAbstractHandler)
   public
-    procedure process(data: TLogData); override;
+    procedure process(Data: TLogData); override;
   end;
+
+  { TLogFileHandler }
+
+  TLogFileHandler = class(TAbstractHandler)
+  private
+    FFileName: string;
+    FCS: TRTLCriticalSection;
+    procedure SetFileName(AValue: string);
+  protected
+    FText: Text;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure process(Data: TLogData); override;
+    property FileName: string read FFileName write SetFileName;
+  end;
+
 
   { TPlainFormatter }
 
   TPlainFormatter = class(TAbstractFormatter)
   public
-    function format(data: TLogData): string; override;
+    function format(Data: TLogData): string; override;
   end;
 
 
-procedure AddLogger(name: string; aLogger: ILogInterface; replace: boolean = False);
-function getLogger(name: string): ILogInterface;
-procedure RemoveLogger(name: string);
+procedure AddLogger(Name: string; aLogger: ILogInterface; replace: boolean = False);
+function getLogger(Name: string): ILogInterface;
+procedure RemoveLogger(Name: string);
 function HasLogger(Name: string): boolean;
 
 function getLogLevelName(aLogLevel: TLogLevel): string;
 
 var
   FailBackFormatter: ILogFormatter;
-  FailBackHandler:   ILogHandler;
+  FailBackHandler: ILogHandler;
 
 implementation
 
@@ -189,7 +215,8 @@ type
     procedure SetLogger(AValue: ILogInterface);
     procedure SetName(AValue: string);
   protected
-    procedure FPOObservedChanged(ASender: TObject; Operation: TFPObservedOperation; Data: Pointer);
+    procedure FPOObservedChanged(ASender: TObject; Operation: TFPObservedOperation;
+      Data: Pointer);
   public
     constructor Create;
     destructor Destroy; override;
@@ -210,59 +237,59 @@ begin
   begin
     LogRegistry := TLogRegistry.Create(True);
   end;
-  result := LogRegistry;
+  Result := LogRegistry;
 end;
 
-procedure AddLogger(name: string; aLogger: ILogInterface; replace: boolean);
+procedure AddLogger(Name: string; aLogger: ILogInterface; replace: boolean);
 var
   lc: TLoggerContainer;
 begin
   getLogRegistry;
-  if HasLogger(name) then
+  if HasLogger(Name) then
   begin
     if replace then
     begin
-      RemoveLogger(name);
+      RemoveLogger(Name);
     end;
     EnterCriticalsection(CS);
     lc := TLoggerContainer.Create;
     LogRegistry.Add(lc);
     lc.Logger := aLogger;
-    lc.Name := name;
+    lc.Name := Name;
     LeaveCriticalsection(CS);
   end;
 end;
 
-function getLogger(name: string): ILogInterface;
+function getLogger(Name: string): ILogInterface;
 var
   lc: TLoggerContainer;
 begin
-  result := nil;
+  Result := nil;
   EnterCriticalsection(CS);
   for lc in getLogRegistry do
   begin
-    if lc.Name = name then
+    if lc.Name = Name then
     begin
-      result := lc.Logger;
+      Result := lc.Logger;
       break;
     end;
   end;
   LeaveCriticalsection(CS);
-  if result = nil then
+  if Result = nil then
   begin
-    result := TSimpleLogger.Create;
-    AddLogger(name, Result);
+    Result := TSimpleLogger.Create;
+    AddLogger(Name, Result);
   end;
 end;
 
-procedure RemoveLogger(name: string);
+procedure RemoveLogger(Name: string);
 var
   lc: TLoggerContainer;
 begin
   EnterCriticalsection(CS);
   for lc in getLogRegistry do
   begin
-    if lc.Name = name then
+    if lc.Name = Name then
     begin
       LogRegistry.Remove(lc);
       break;
@@ -275,13 +302,13 @@ function HasLogger(Name: string): boolean;
 var
   lc: TLoggerContainer;
 begin
-  result := False;
+  Result := False;
   EnterCriticalsection(CS);
   for lc in getLogRegistry do
   begin
-    if lc.Name = name then
+    if lc.Name = Name then
     begin
-      result := True;
+      Result := True;
       break;
     end;
   end;
@@ -290,73 +317,109 @@ end;
 
 function getLogLevelName(aLogLevel: TLogLevel): string;
 begin
-  result := '??';
+  Result := '??';
   case aLogLevel of
     API:
     begin
-      result := 'API';
+      Result := 'API';
     end;
     DEBUG:
     begin
-      result := 'DEBUG';
+      Result := 'DEBUG';
     end;
     INFO:
     begin
-      result := 'INFO';
+      Result := 'INFO';
     end;
     NOTICE:
     begin
-      result := 'NOTICE';
+      Result := 'NOTICE';
     end;
     WARNING:
     begin
-      result := 'WARNING';
+      Result := 'WARNING';
     end;
     ERROR:
     begin
-      result := 'ERROR';
+      Result := 'ERROR';
     end;
     CRITICAL:
     begin
-      result := 'CRITICAL';
+      Result := 'CRITICAL';
     end;
     ALERT:
     begin
-      result := 'ALERT';
+      Result := 'ALERT';
     end;
     EMERGENCY:
     begin
-      result := 'EMERGENCY';
+      Result := 'EMERGENCY';
     end;
   end;
 end;
 
+{ TLogFileHandler }
+
+procedure TLogFileHandler.SetFileName(AValue: string);
+begin
+  if FFileName = AValue then
+    Exit;
+  FFileName := AValue;
+end;
+
+constructor TLogFileHandler.Create;
+begin
+  InitCriticalSection(FCS);
+end;
+
+destructor TLogFileHandler.Destroy;
+begin
+  DoneCriticalSection(FCS);
+  inherited Destroy;
+end;
+
+procedure TLogFileHandler.process(Data: TLogData);
+begin
+  EnterCriticalsection(FCS);
+  AssignFile(FText, FFileName);
+  if FileExists(FFileName) then
+  begin
+    Append(FText);
+  end
+  else
+    Rewrite(FText);
+  Writeln(FText, Formatter.format(Data));
+  CloseFile(FText);
+  LeaveCriticalsection(FCS);
+end;
+
 { TSimpleLogger }
 
-procedure TSimpleLogger.Log(data: TLogData);
+procedure TSimpleLogger.Log(Data: TLogData);
 begin
-  if FThreshold <= data.level then
+  if FThreshold <= Data.level then
   begin
     if FailBackHandler <> nil then
     begin
-      FailBackHandler.process(data);
+      FailBackHandler.process(Data);
     end;
   end;
 end;
 
 { TPlainFormatter }
 
-function TPlainFormatter.format(data: TLogData): string;
+function TPlainFormatter.format(Data: TLogData): string;
 var
   dateString: string;
 begin
-  DateTimeToString(dateString, 'yyyy:mm:dd hh:nn:ss.zzz', data.dateTime);
-  result := SysUtils.Format('[%-16s]|[%-9s]|[%d.%d]|%s', [dateString, getLogLevelName(data.level), data.process, data.thread, data.message]);
+  DateTimeToString(dateString, 'yyyy:mm:dd hh:nn:ss.zzz', Data.dateTime);
+  Result := SysUtils.Format('[%-16s]|[%-9s]|[%d.%d]|%s',
+    [dateString, getLogLevelName(Data.level), Data.process, Data.thread, Data.message]);
 end;
 
-{ TConsoleHandler }
+{ TLogConsoleHandler }
 
-procedure TConsoleHandler.process(data: TLogData);
+procedure TLogConsoleHandler.process(Data: TLogData);
 begin
   if Formatter = nil then
   begin
@@ -364,15 +427,17 @@ begin
   end;
   if IsConsole then
   begin
-    Writeln(self.Formatter.format(data));
+    Writeln(self.Formatter.format(Data));
   end;
 end;
 
 { TAbstractHandler }
 
-procedure TAbstractHandler.FPOObservedChanged(ASender: TObject; Operation: TFPObservedOperation; Data: Pointer);
+procedure TAbstractHandler.FPOObservedChanged(ASender: TObject;
+  Operation: TFPObservedOperation; Data: Pointer);
 begin
-  if Supports(ASender, ILogFormatter) and ((ASender as ILogFormatter) = FFormatter) and (Operation in [ooFree, ooDeleteItem]) then
+  if Supports(ASender, ILogFormatter) and ((ASender as ILogFormatter) = FFormatter) and
+    (Operation in [ooFree, ooDeleteItem]) then
   begin
     FFormatter := nil;
   end;
@@ -413,107 +478,117 @@ end;
 
 function TAbstractLogger.getLogData(logLevel: TLogLevel; message: string): TLogData;
 begin
-  result.dateTime := now;
-  result.message := message;
-  result.level := logLevel;
-  result.thread := GetCurrentThreadId;
-  result.process := GetProcessID;
+  Result.dateTime := now;
+  Result.message := message;
+  Result.level := logLevel;
+  Result.thread := GetCurrentThreadId;
+  Result.process := GetProcessID;
 end;
 
-procedure TAbstractLogger.FPOObservedChanged(ASender: TObject; Operation: TFPObservedOperation; Data: Pointer);
+procedure TAbstractLogger.FPOObservedChanged(ASender: TObject;
+  Operation: TFPObservedOperation; Data: Pointer);
 begin
-  if Supports(ASender, ILogFormatter) and ((ASender as ILogFormatter) = FFormatter) and (Operation in [ooFree, ooDeleteItem]) then
+  if Supports(ASender, ILogFormatter) and ((ASender as ILogFormatter) = FFormatter) and
+    (Operation in [ooFree, ooDeleteItem]) then
   begin
     FFormatter := nil;
   end;
 end;
 
-function TAbstractLogger.emergency(message: string; const parameters: array of const): ILogInterface;
+function TAbstractLogger.emergency(message: string;
+  const parameters: array of const): ILogInterface;
 begin
-  result := emergency(Format(message, parameters));
+  Result := emergency(Format(message, parameters));
 end;
 
-function TAbstractLogger.alert(message: string; const parameters: array of const): ILogInterface;
+function TAbstractLogger.alert(message: string;
+  const parameters: array of const): ILogInterface;
 begin
-  result := alert(Format(message, parameters));
+  Result := alert(Format(message, parameters));
 end;
 
-function TAbstractLogger.critical(message: string; const parameters: array of const): ILogInterface;
+function TAbstractLogger.critical(message: string;
+  const parameters: array of const): ILogInterface;
 begin
-  result := critical(Format(message, parameters));
+  Result := critical(Format(message, parameters));
 end;
 
-function TAbstractLogger.error(message: string; const parameters: array of const): ILogInterface;
+function TAbstractLogger.error(message: string;
+  const parameters: array of const): ILogInterface;
 begin
-  result := error(Format(message, parameters));
+  Result := error(Format(message, parameters));
 end;
 
-function TAbstractLogger.warning(message: string; const parameters: array of const): ILogInterface;
+function TAbstractLogger.warning(message: string;
+  const parameters: array of const): ILogInterface;
 begin
-  result := error(Format(message, parameters));
+  Result := error(Format(message, parameters));
 end;
 
-function TAbstractLogger.notice(message: string; const parameters: array of const): ILogInterface;
+function TAbstractLogger.notice(message: string;
+  const parameters: array of const): ILogInterface;
 begin
-  result := notice(Format(message, parameters));
+  Result := notice(Format(message, parameters));
 end;
 
-function TAbstractLogger.info(message: string; const parameters: array of const): ILogInterface;
+function TAbstractLogger.info(message: string;
+  const parameters: array of const): ILogInterface;
 begin
-  result := info(Format(message, parameters));
+  Result := info(Format(message, parameters));
 end;
 
-function TAbstractLogger.debug(message: string; const parameters: array of const): ILogInterface;
+function TAbstractLogger.debug(message: string;
+  const parameters: array of const): ILogInterface;
 begin
-  result := debug(Format(message, parameters));
+  Result := debug(Format(message, parameters));
 end;
 
 function TAbstractLogger.emergency(message: string): ILogInterface;
 begin
   log(getLogData(TLogLevel.EMERGENCY, message));
-  result := self;
+  Result := self;
 end;
 
 function TAbstractLogger.alert(message: string): ILogInterface;
 begin
   log(getLogData(TLogLevel.ALERT, message));
-  result := self;
+  Result := self;
 end;
 
 function TAbstractLogger.critical(message: string): ILogInterface;
 begin
   log(getLogData(TLogLevel.CRITICAL, message));
-  result := self;
+  Result := self;
 end;
 
 function TAbstractLogger.error(message: string): ILogInterface;
 begin
   log(getLogData(TLogLevel.ERROR, message));
-  result := self;
+  Result := self;
 end;
 
 function TAbstractLogger.warning(message: string): ILogInterface;
 begin
   log(getLogData(TLogLevel.WARNING, message));
-  result := self;
+  Result := self;
 end;
 
 function TAbstractLogger.notice(message: string): ILogInterface;
 begin
   log(getLogData(TLogLevel.NOTICE, message));
-  result := self;
+  Result := self;
 end;
 
 function TAbstractLogger.info(message: string): ILogInterface;
 begin
   log(getLogData(TLogLevel.INFO, message));
-  result := self;
+  Result := self;
 end;
 
 function TAbstractLogger.debug(message: string): ILogInterface;
 begin
   log(getLogData(TLogLevel.DEBUG, message));
-  result := self;
+  Result := self;
 end;
 
 procedure TAbstractLogger.setThreshold(threshold: TLogLevel);
@@ -523,12 +598,12 @@ end;
 
 function TAbstractLogger.getThreshold: TLogLevel;
 begin
-  result := FThreshold;
+  Result := FThreshold;
 end;
 
 function TAbstractLogger.getFormatter: ILogFormatter;
 begin
-  result := FFormatter;
+  Result := FFormatter;
 end;
 
 procedure TAbstractLogger.setFormatter(aFormatter: ILogFormatter);
@@ -542,6 +617,20 @@ begin
   begin
     FFormatter.FPOAttachObserver(Self);
   end;
+end;
+
+function TAbstractLogger.getHandler: ILogHandler;
+begin
+  Result := FHandler;
+end;
+
+procedure TAbstractLogger.setHandler(aHandler: ILogHandler);
+begin
+  if FHandler <> nil then
+    FHandler.FPODetachObserver(Self);
+  FHandler := aHandler;
+  if FHandler <> nil then
+    FHandler.FPOAttachObserver(Self);
 end;
 
 constructor TAbstractLogger.Create;
@@ -591,9 +680,11 @@ begin
   inherited Destroy;
 end;
 
-procedure TLoggerContainer.FPOObservedChanged(ASender: TObject; Operation: TFPObservedOperation; Data: Pointer);
+procedure TLoggerContainer.FPOObservedChanged(ASender: TObject;
+  Operation: TFPObservedOperation; Data: Pointer);
 begin
-  if Supports(ASender, ILogInterface) and ((ASender as ILogInterface) = FLogger) and (Operation in [ooFree, ooDeleteItem]) then
+  if Supports(ASender, ILogInterface) and ((ASender as ILogInterface) = FLogger) and
+    (Operation in [ooFree, ooDeleteItem]) then
   begin
     FLogger := nil;
   end;
@@ -601,7 +692,7 @@ end;
 
 { TNullLogger }
 
-procedure TNullLogger.Log(data: TLogData);
+procedure TNullLogger.Log(Data: TLogData);
 begin
 
 end;
@@ -611,7 +702,7 @@ initialization
 
   LogRegistry := nil;
   InitCriticalSection(CS);
-  FailBackHandler := TConsoleHandler.Create;
+  FailBackHandler := TLogConsoleHandler.Create;
   FailBackFormatter := TPlainFormatter.Create;
 
 finalization
